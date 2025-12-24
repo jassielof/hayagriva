@@ -83,6 +83,24 @@ pub fn from_biblatex(bibliography: &Bibliography) -> Result<Library, Vec<TypeErr
     }
 }
 
+/// Convert a bibliography library to a BibLaTeX format string.
+#[cfg(feature = "biblatex")]
+pub fn to_biblatex_str(entries: &Library) -> String {
+    entries.iter()
+        .map(|entry| crate::interop::to_biblatex_str(entry))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Convert a bibliography library to a BibTeX format string.
+#[cfg(feature = "biblatex")]
+pub fn to_bibtex_str(entries: &Library) -> String {
+    entries.iter()
+        .map(|entry| crate::interop::to_bibtex_str(entry))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -655,6 +655,333 @@ fn comma_list(items: &[Vec<Spanned<Chunk>>]) -> FormatString {
     FormatString { value, short: None }
 }
 
+/// Convert a Hayagriva EntryType to a BibTeX/BibLaTeX entry type string.
+fn entry_type_to_biblatex(entry_type: super::EntryType, parent: Option<super::EntryType>) -> &'static str {
+    match (&entry_type, parent.as_ref()) {
+        (super::EntryType::Article, Some(super::EntryType::Periodical)) => "article",
+        (super::EntryType::Article, Some(super::EntryType::Proceedings)) => "inproceedings",
+        (super::EntryType::Article, Some(super::EntryType::Conference)) => "inproceedings",
+        (super::EntryType::Chapter, Some(super::EntryType::Book)) => "inbook",
+        (super::EntryType::Anthos, Some(super::EntryType::Anthology)) => "incollection",
+        (super::EntryType::Book, None) => "book",
+        (super::EntryType::Thesis, None) => "phdthesis",
+        (super::EntryType::Report, None) => "techreport",
+        (super::EntryType::Manuscript, None) => "unpublished",
+        (super::EntryType::Misc, None) => "misc",
+        (super::EntryType::Proceedings, None) => "proceedings",
+        (super::EntryType::Reference, None) => "manual",
+        (super::EntryType::Patent, None) => "patent",
+        (super::EntryType::Web, None) => "online",
+        (super::EntryType::Repository, None) => "dataset",
+        _ => "misc",
+    }
+}
+
+/// Escape a string for BibTeX/BibLaTeX format.
+fn escape_bibtex(s: &str) -> String {
+    s.chars()
+        .flat_map(|c| match c {
+            '{' => vec!['{', '{'],
+            '}' => vec!['}', '}'],
+            '&' => vec!['\\', '&'],
+            '%' => vec!['\\', '%'],
+            '$' => vec!['\\', '$'],
+            '#' => vec!['\\', '#'],
+            '_' => vec!['\\', '_'],
+            '\\' => vec!['\\', '\\'],
+            '~' => vec!['\\', '~'],
+            '^' => vec!['\\', '^'],
+            c => vec![c],
+        })
+        .collect()
+}
+
+/// Format a FormatString for BibTeX output.
+fn format_string_to_bibtex(fs: &super::FormatString) -> String {
+    let mut result = String::new();
+    for chunk in &fs.value.0 {
+        let text = &chunk.value;
+        match chunk.kind {
+            super::ChunkKind::Normal => {
+                result.push_str(&escape_bibtex(text));
+            }
+            super::ChunkKind::Verbatim => {
+                result.push('{');
+                result.push_str(text);
+                result.push('}');
+            }
+            super::ChunkKind::Math => {
+                result.push('$');
+                result.push_str(text);
+                result.push('$');
+            }
+        }
+    }
+    result
+}
+
+/// Format a Person for BibTeX author field.
+fn person_to_bibtex(p: &super::Person) -> String {
+    let mut name = String::new();
+    if let Some(prefix) = &p.prefix {
+        name.push_str(prefix);
+        name.push(' ');
+    }
+    name.push_str(&p.name);
+    if let Some(given) = &p.given_name {
+        name.push_str(", ");
+        name.push_str(given);
+    }
+    if let Some(suffix) = &p.suffix {
+        name.push_str(", ");
+        name.push_str(suffix);
+    }
+    escape_bibtex(&name)
+}
+
+/// Format persons list for BibTeX author/editor field.
+fn persons_to_bibtex(persons: &[super::Person]) -> String {
+    persons.iter()
+        .map(person_to_bibtex)
+        .collect::<Vec<_>>()
+        .join(" and ")
+}
+
+/// Convert a Hayagriva Entry to BibTeX/BibLaTeX format string.
+#[cfg(feature = "biblatex")]
+pub fn to_biblatex_str(entry: &super::Entry) -> String {
+    to_bibtex_str_internal(entry, true)
+}
+
+/// Convert a Hayagriva Entry to BibTeX format string.
+#[cfg(feature = "biblatex")]
+pub fn to_bibtex_str(entry: &super::Entry) -> String {
+    to_bibtex_str_internal(entry, false)
+}
+
+#[cfg(feature = "biblatex")]
+fn to_bibtex_str_internal(entry: &super::Entry, biblatex: bool) -> String {
+    use std::fmt::Write;
+
+    let parent_type = entry.parents().first().map(|p| *p.entry_type());
+    let entry_type_str = entry_type_to_biblatex(*entry.entry_type(), parent_type);
+
+    let mut output = String::new();
+    write!(output, "@{}{{{}", entry_type_str, entry.key()).unwrap();
+    output.push('\n');
+
+    let mut fields = Vec::new();
+
+    // Title
+    if let Some(title) = entry.title() {
+        let title_val = format_string_to_bibtex(title);
+        if biblatex || parent_type.is_none() {
+            fields.push(("title", title_val));
+        } else {
+            // For BibTeX, use booktitle for parent entries
+            fields.push(("booktitle", title_val));
+        }
+    }
+
+    // Parent title handling
+    if let Some(parent) = entry.parents().first() {
+        if let Some(parent_title) = parent.title() {
+            let parent_title_val = format_string_to_bibtex(parent_title);
+            match entry.entry_type() {
+                super::EntryType::Article => {
+                    fields.push(("journaltitle", parent_title_val));
+                }
+                super::EntryType::Chapter | super::EntryType::Anthos => {
+                    fields.push(("booktitle", parent_title_val));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Authors
+    if let Some(authors) = entry.authors() {
+        let authors_str = persons_to_bibtex(authors);
+        fields.push(("author", authors_str));
+    }
+
+    // Editors
+    if let Some(editors) = entry.editors() {
+        let editors_str = persons_to_bibtex(editors);
+        fields.push(("editor", editors_str));
+    } else if let Some(parent) = entry.parents().first() {
+        if let Some(parent_editors) = parent.editors() {
+            let editors_str = persons_to_bibtex(parent_editors);
+            fields.push(("editor", editors_str));
+        }
+    }
+
+    // Date
+    if let Some(date) = entry.date() {
+        let mut date_str = String::new();
+        date_str.push_str(&date.year.to_string());
+        if let Some(month) = date.month {
+            date_str.push('-');
+            write!(date_str, "{:02}", month + 1).unwrap(); // BibTeX months are 1-indexed
+        }
+        if let Some(day) = date.day {
+            date_str.push('-');
+            write!(date_str, "{:02}", day + 1).unwrap(); // BibTeX days are 1-indexed
+        }
+        if biblatex {
+            fields.push(("date", date_str));
+        } else {
+            // BibTeX uses separate year/month fields
+            fields.push(("year", date.year.to_string()));
+            if let Some(month) = date.month {
+                fields.push(("month", (month + 1).to_string())); // BibTeX months are 1-indexed
+            }
+        }
+    }
+
+    // Publisher
+    if let Some(publisher) = entry.publisher() {
+        if let Some(name) = publisher.name() {
+            let pub_name = format_string_to_bibtex(name);
+            fields.push(("publisher", pub_name));
+        }
+        if let Some(location) = publisher.location() {
+            let loc = format_string_to_bibtex(location);
+            fields.push(("location", loc));
+        }
+    } else if let Some(parent) = entry.parents().first() {
+        if let Some(parent_publisher) = parent.publisher() {
+            if let Some(name) = parent_publisher.name() {
+                let pub_name = format_string_to_bibtex(name);
+                fields.push(("publisher", pub_name));
+            }
+            if let Some(location) = parent_publisher.location() {
+                let loc = format_string_to_bibtex(location);
+                fields.push(("location", loc));
+            }
+        }
+    }
+
+    // Volume
+    if let Some(volume) = entry.volume() {
+        if let Some(vol) = volume.as_typed() {
+            fields.push(("volume", vol.to_string()));
+        }
+    } else if let Some(parent) = entry.parents().first() {
+        if let Some(parent_volume) = parent.volume() {
+            if let Some(vol) = parent_volume.as_typed() {
+                fields.push(("volume", vol.to_string()));
+            }
+        }
+    }
+
+    // Issue
+    if let Some(issue) = entry.issue() {
+        if let Some(iss) = issue.as_typed() {
+            fields.push(("number", iss.to_string()));
+        }
+    } else if let Some(parent) = entry.parents().first() {
+        if let Some(parent_issue) = parent.issue() {
+            if let Some(iss) = parent_issue.as_typed() {
+                fields.push(("number", iss.to_string()));
+            }
+        }
+    }
+
+    // Pages
+    if let Some(pages) = entry.page_range() {
+        if let Some(typed_pages) = pages.as_typed() {
+            let mut pages_str = String::new();
+            for (i, part) in typed_pages.ranges.iter().enumerate() {
+                if i > 0 && !matches!(part, super::PageRangesPart::Comma | super::PageRangesPart::Ampersand) {
+                    pages_str.push_str(", ");
+                }
+                match part {
+                    super::PageRangesPart::SinglePage(n) => {
+                        pages_str.push_str(&n.to_string());
+                    }
+                    super::PageRangesPart::Range(start, end) => {
+                        write!(pages_str, "{}-{}", start, end).unwrap();
+                    }
+                    super::PageRangesPart::EscapedRange(start, end) => {
+                        write!(pages_str, "{}\\-{}", start, end).unwrap();
+                    }
+                    super::PageRangesPart::Ampersand => {
+                        pages_str.push_str(" & ");
+                    }
+                    super::PageRangesPart::Comma => {
+                        pages_str.push_str(", ");
+                    }
+                }
+            }
+            fields.push(("pages", pages_str));
+        } else {
+            // Unparsed string
+            fields.push(("pages", pages.to_string()));
+        }
+    }
+
+    // DOI
+    if let Some(doi) = entry.doi() {
+        fields.push(("doi", doi.to_string()));
+    }
+
+    // ISBN
+    if let Some(isbn) = entry.isbn() {
+        fields.push(("isbn", isbn.to_string()));
+    }
+
+    // ISSN
+    if let Some(issn) = entry.issn() {
+        fields.push(("issn", issn.to_string()));
+    }
+
+    // URL
+    if let Some(url) = entry.url() {
+        fields.push(("url", url.value.to_string()));
+        if let Some(visit_date) = &url.visit_date {
+            let mut date_str = String::new();
+            date_str.push_str(&visit_date.year.to_string());
+            if let Some(month) = visit_date.month {
+                date_str.push('-');
+                write!(date_str, "{:02}", month + 1).unwrap(); // BibTeX months are 1-indexed
+            }
+            if let Some(day) = visit_date.day {
+                date_str.push('-');
+                write!(date_str, "{:02}", day + 1).unwrap(); // BibTeX days are 1-indexed
+            }
+            if !date_str.is_empty() {
+                fields.push(("urldate", date_str));
+            }
+        }
+    }
+
+    // Note
+    if let Some(note) = entry.note() {
+        let note_val = format_string_to_bibtex(note);
+        fields.push(("note", note_val));
+    }
+
+    // Abstract
+    if let Some(abstract_) = entry.abstract_() {
+        let abs = format_string_to_bibtex(abstract_);
+        fields.push(("abstract", abs));
+    }
+
+    // Language
+    if let Some(lang) = entry.language() {
+        fields.push(("language", lang.to_string()));
+    }
+
+    // Format fields
+    for (field_name, field_value) in &fields {
+        write!(output, "    {} = {{{}}},\n", field_name, field_value).unwrap();
+    }
+
+    output.push_str("}\n");
+    output
+}
+
 #[cfg(test)]
 mod tests {
     use unic_langid::LanguageIdentifier;

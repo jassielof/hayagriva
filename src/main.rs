@@ -62,10 +62,18 @@ fn main() {
                     .help("Sets the bibliography file to use")
                     .required(true)
                     .index(1)
-            ).arg(
+            )            .arg(
                 Arg::new("format")
                     .long("format")
                     .help("What input file format to expect")
+                    .value_parser(clap::value_parser!(Format))
+                    .ignore_case(true)
+                    .num_args(1)
+                    .global(true),
+            ).arg(
+                Arg::new("output-format")
+                    .long("output-format")
+                    .help("What output file format to use")
                     .value_parser(clap::value_parser!(Format))
                     .ignore_case(true)
                     .num_args(1)
@@ -441,8 +449,15 @@ fn main() {
             }
         }
         _ => {
-            let bib = io::to_yaml_str(&bibliography).unwrap();
-            println!("{bib}");
+            let output_format = matches.get_one("output-format").cloned().unwrap_or(format);
+            let output = match output_format {
+                Format::Yaml => io::to_yaml_str(&bibliography).unwrap(),
+                #[cfg(feature = "biblatex")]
+                Format::Biblatex => io::to_biblatex_str(&bibliography),
+                #[cfg(feature = "biblatex")]
+                Format::Bibtex => io::to_bibtex_str(&bibliography),
+            };
+            print!("{output}");
         }
     }
 }
