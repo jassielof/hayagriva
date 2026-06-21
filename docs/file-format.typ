@@ -130,266 +130,591 @@ This section lists all possible fields and data types for them.
   },
 )
 
-// ==== `title`
-// #format-field(
-//   [formattable string],
-//   [title of the item],
-//   ```yaml
-//   title: "Rick Astley: How An Internet Joke Revived My Career"
-//   ```,
-// )
+#format-field(
+  "title",
+  [formattable string],
+  [Title of the item.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 3,
+          start: 5,
+          end: 56,
+        ),
+      ),
+    )
+    raw(
+      read("samples/overview.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `author`
-// #format-field(
-//   [person / list of persons],
-//   [persons primarily responsible for the creation of the item],
-//   ```yaml
-//   author: ["Klocke, Iny", "Wohlrath, Elmar"]
-//   ```,
-// )
+#format-field(
+  "author",
+  [person / list of persons],
+  [Persons primarily responsible for the creation of the item.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 3,
+          start: 5,
+          end: 50,
+        ),
+      ),
+    )
+    raw(
+      read("samples/wwdc-network.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `date`
-// #format-field(
-//   [date],
-//   [date at which the item was published],
-//   ```yaml
-//   date: 1949-05
-//   ```,
-// )
+#format-field(
+  "date",
+  [date],
+  [Date at which the item was published.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 5,
+          start: 5,
+          end: 20,
+        ),
+      ),
+    )
+    raw(
+      read("samples/wwdc-network.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `parent`
-// #format-field(
-//   [entry],
-//   [item in which the item was published / to which it is strongly associated to],
-//   ```yaml
-//   parent:
-//       type: Anthology
-//       title: Automata studies
-//       editor: ["Shannon, C. E.", "McCarthy, J."]
-//   ```,
-// )
+#format-field(
+  "parent",
+  [entry],
+  [Item in which the item was published / to which it is strongly associated.],
+  {
+    codly(
+      highlights: (
+        (line: 9, start: 5, end: 25),
+      ),
+    )
+    raw(
+      read("samples/kinetics.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `abstract`
-// #format-field(
-//   [formattable string],
-//   [Abstract of the item (e.g. the abstract of a journal article).],
-//   ```yaml
-//   abstract: The dominant sequence transduction models are based on complex...
-//   ```,
-// )
+#format-field(
+  "abstract",
+  [formattable string],
+  [Abstract of the item (e.g. the abstract of a journal article).],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 82,
+        ),
+      ),
+    )
+    raw(
+      read("samples/abstract.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `genre`
-// #format-field(
-//   [formattable string],
-//   [Type, class, or subtype of the item (e.g. "Doctoral dissertation" for a PhD thesis; "NIH Publication" for an NIH technical report). Do not use for topical descriptions or categories (e.g. "adventure" for an adventure movie).],
-//   ```yaml
-//   genre: Doctoral dissertation
-//   ```,
-// )
+#format-field(
+  "genre",
+  [formattable string],
+  [Type, class, or subtype of the item (e.g. "Doctoral dissertation" for a PhD thesis; "NIH Publication" for an NIH technical report). Do not use for topical descriptions or categories (e.g. "adventure" for an adventure movie).],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 33,
+        ),
+      ),
+    )
+    raw(
+      read("samples/genre.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `editor`
-// #format-field(
-//   [person / list of persons],
-//   [persons responsible for selecting and revising the content of the item],
-//   ```yaml
-//   editor:
-//       - Stringer, Gary A.
-//       - Pebworth, Ted-Larry
-//   ```,
-// )
+#format-field(
+  "editor",
+  [person / list of persons],
+  [Persons responsible for selecting and revising the content of the item.],
+  {
+    codly(
+      highlights: (
+        (line: 4, start: 5, end: 12),
+        (line: 5, start: 9, end: 28),
+        (line: 6, start: 9, end: 30),
+      ),
+    )
+    raw(
+      read("samples/editor.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `affiliated`
-// #format-field(
-//   [list of persons with role / list of lists of persons with role],
-//   [persons involved with the item that do not fit `author` or `editor`],
-//   ```yaml
-//   affiliated:
-//       - role: Director
-//         names: Cameron, James
-//       - role: CastMember
-//         names: ["Schwarzenegger, Arnold", "Hamilton, Linda", "Patrick, Robert"]
-//   ```,
-// )
+#format-field(
+  "affiliated",
+  [list of persons with role / list of lists of persons with role],
+  [Persons involved with the item that do not fit `author` or `editor`.],
+  {
+    codly(
+      highlights: (
+        (line: 4, start: 5, end: 16),
+        (line: 5, start: 9, end: 25),
+        (line: 6, start: 11, end: 32),
+        (line: 7, start: 9, end: 27),
+        (line: 8, start: 11, end: 82),
+      ),
+    )
+    raw(
+      read("samples/affiliated.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `call-number`
-// #format-field(
-//   [formattable string],
-//   [The number of the item in a library, institution, or collection. Use with `archive`.],
-//   ```yaml
-//   call-number: "F16 D14"
-//   ```,
-// )
+#format-field(
+  "call-number",
+  [formattable string],
+  [The number of the item in a library, institution, or collection. Use with `archive`.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 5,
+          start: 5,
+          end: 31,
+        ),
+      ),
+    )
+    raw(
+      read("samples/call-number.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `publisher`
-// #format-field(
-//   [publisher],
-//   [publisher of the item],
-//   ```yaml
-//   publisher: Penguin Books
-//   #// Or:
-//   publisher:
-//       name: Penguin Books
-//       location: London
-//   ```,
-// )
+#format-field(
+  "publisher",
+  [publisher],
+  [Publisher of the item.],
+  {
+    codly(
+      highlights: (
+        (line: 4, start: 5, end: 15),
+        (line: 5, start: 9, end: 28),
+        (line: 6, start: 9, end: 25),
+      ),
+    )
+    raw(
+      read("samples/publisher.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `location`
-// #format-field(
-//   [formattable string],
-//   [location at which an entry is physically located or took place. For the location where an item was published, see `publisher`.],
-//   ```yaml
-//   location: Lahore, Pakistan
-//   ```,
-// )
+#format-field(
+  "location",
+  [formattable string],
+  [Location at which an entry is physically located or took place. For the location where an item was published, see `publisher`.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 34,
+        ),
+      ),
+    )
+    raw(
+      read("samples/location.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `organization`
-// #format-field(
-//   [formattable string],
-//   [Organization at/for which the item was produced],
-//   ```yaml
-//   organization: Technische Universität Berlin
-//   ```,
-// )
+#format-field(
+  "organization",
+  [formattable string],
+  [Organization at/for which the item was produced.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 52,
+        ),
+      ),
+    )
+    raw(
+      read("samples/organization.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `issue`
-// #format-field(
-//   [numeric or string],
-//   [For an item whose parent has multiple issues, indicates the position in the issue sequence. Also used to indicate the episode number for TV.],
-//   ```yaml
-//   issue: 5
-//   ```,
-// )
+#format-field(
+  "issue",
+  [numeric or string],
+  [For an item whose parent has multiple issues, indicates the position in the issue sequence. Also used to indicate the episode number for TV.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 17,
+        ),
+      ),
+    )
+    raw(
+      read("samples/issue.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `volume`
-// #format-field(
-//   [numeric or string],
-//   [For an item whose parent has multiple volumes/parts/seasons ... of which this item is one],
-//   ```yaml
-//   volume: 2-3
-//   ```,
-// )
+#format-field(
+  "volume",
+  [numeric or string],
+  [For an item whose parent has multiple volumes/parts/seasons ... of which this item is one.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 20,
+        ),
+      ),
+    )
+    raw(
+      read("samples/volume.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `volume-total`
-// #format-field(
-//   [numeric],
-//   [Total number of volumes/parts/seasons this item consists of],
-//   ```yaml
-//   volume-total: 12
-//   ```,
-// )
+#format-field(
+  "volume-total",
+  [numeric],
+  [Total number of volumes/parts/seasons this item consists of.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 25,
+        ),
+      ),
+    )
+    raw(
+      read("samples/volume-total.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `chapter`
-// #format-field(
-//   [numeric or string],
-//   [The number of the chapter in the referenced work where this item can be found. When the chapter itself is the item being cited, which is common if it has its own non-numeric title, prefer using `type: chapter` for the entry while specifying the containing work's data as its parent.],
-//   ```yaml
-//   chapter: 4
-//   ```,
-// )
+#format-field(
+  "chapter",
+  [numeric or string],
+  [The number of the chapter in the referenced work where this item can be found. When the chapter itself is the item being cited, which is common if it has its own non-numeric title, prefer using `type: chapter` for the entry while specifying the containing work's data as its parent.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 19,
+        ),
+      ),
+    )
+    raw(
+      read("samples/chapter.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `edition`
-// #format-field(
-//   [numeric or string],
-//   [published version of an item],
-//   ```yaml
-//   edition: expanded and revised edition
-//   ```,
-// )
+#format-field(
+  "edition",
+  [numeric or string],
+  [Published version of an item.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 46,
+        ),
+      ),
+    )
+    raw(
+      read("samples/edition.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `page-range`
-// #format-field(
-//   [numeric or string],
-//   [the range of pages within the parent this item occupies],
-//   ```yaml
-//   page-range: 812-847
-//   ```,
-// )
+#format-field(
+  "page-range",
+  [numeric or string],
+  [The range of pages within the parent this item occupies.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 28,
+        ),
+      ),
+    )
+    raw(
+      read("samples/page-range.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `page-total`
-// #format-field(
-//   [numeric],
-//   [total number of pages the item has],
-//   ```yaml
-//   page-total: 1103
-//   ```,
-// )
+#format-field(
+  "page-total",
+  [numeric],
+  [Total number of pages the item has.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 25,
+        ),
+      ),
+    )
+    raw(
+      read("samples/page-total.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `time-range`
-// #format-field(
-//   [timestamp range],
-//   [the time range within the parent this item starts and ends at],
-//   ```yaml
-//   time-range: 00:57-06:21
-//   ```,
-// )
+#format-field(
+  "time-range",
+  [timestamp range],
+  [The time range within the parent this item starts and ends at.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 32,
+        ),
+      ),
+    )
+    raw(
+      read("samples/time-range.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `runtime`
-// #format-field(
-//   [timestamp],
-//   [total runtime of the item],
-//   ```yaml
-//   runtime: 01:42:21,802
-//   ```,
-// )
+#format-field(
+  "runtime",
+  [timestamp],
+  [Total runtime of the item.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 30,
+        ),
+      ),
+    )
+    raw(
+      read("samples/runtime.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `url`
-// #format-field(
-//   [url],
-//   [canonical public URL of the item, can have access date],
-//   ```yaml
-//   url: { value: https://www.reddit.com/r/AccidentalRenaissance/comments/er1uxd/japanese_opposition_members_trying_to_block_the/, date: 2020-12-29 }
-//   ```,
-// )
+#format-field(
+  "url",
+  [url],
+  [Canonical public URL of the item, can have access date.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 152,
+        ),
+      ),
+    )
+    raw(
+      read("samples/url.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `serial-number`
-// #format-field(
-//   [string or dictionary of strings],
-//   [Any serial number, including article numbers. If you have serial numbers of well-known schemes like `doi`, you should put them into the serial number as a dictionary. Hayagriva will recognize and specially treat `doi`, `isbn`, `issn`, `pmid`, `pmcid`, and `arxiv`. You can also include `serial` for the serial number when you provide other formats as well.],
-//   ```yaml
-//   serial-number: 2003.13722
-//   #// Or:
-//   serial-number:
-//       doi: "10.22541/au.148771883.35456290"
-//       arxiv: "1906.00356"
-//       serial: "8516"
-//   ```,
-// )
+#format-field(
+  "serial-number",
+  [string or dictionary of strings],
+  [Any serial number, including article numbers. If you have serial numbers of well-known schemes like `doi`, you should put them into the serial number as a dictionary. Hayagriva will recognize and specially treat `doi`, `isbn`, `issn`, `pmid`, `pmcid`, and `arxiv`. You can also include `serial` for the serial number when you provide other formats as well.],
+  {
+    codly(
+      highlights: (
+        (line: 4, start: 5, end: 19),
+        (line: 5, start: 9, end: 46),
+        (line: 6, start: 9, end: 28),
+        (line: 7, start: 9, end: 23),
+      ),
+    )
+    raw(
+      read("samples/serial-number.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `language`
-// #format-field(
-//   [unicode language identifier],
-//   [language of the item],
-//   ```yaml
-//   language: zh-Hans
-//   ```,
-// )
+#format-field(
+  "language",
+  [unicode language identifier],
+  [Language of the item.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 21,
+        ),
+      ),
+    )
+    raw(
+      read("samples/language.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `archive`
-// #format-field(
-//   [formattable string],
-//   [name of the institution/collection where the item is kept],
-//   ```yaml
-//   archive: National Library of New Zealand
-//   ```,
-// )
+#format-field(
+  "archive",
+  [formattable string],
+  [Name of the institution/collection where the item is kept.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 34,
+        ),
+      ),
+    )
+    raw(
+      read("samples/archive.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `archive-location`
-// #format-field(
-//   [formattable string],
-//   [location of the institution/collection where the item is kept],
-//   ```yaml
-//   archive-location: Wellington, New Zealand
-//   ```,
-// )
+#format-field(
+  "archive-location",
+  [formattable string],
+  [Location of the institution/collection where the item is kept.],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 43,
+        ),
+      ),
+    )
+    raw(
+      read("samples/archive-location.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
 
-// ==== `note`
-// #format-field(
-//   [formattable string],
-//   [short markup, decoration, or annotation to the item (e.g., to indicate items included in a review).],
-//   ```yaml
-//   note: microfilm version
-//   ```,
-// )
+#format-field(
+  "note",
+  [formattable string],
+  [Short markup, decoration, or annotation to the item (e.g., to indicate items included in a review).],
+  {
+    codly(
+      highlights: (
+        (
+          line: 4,
+          start: 5,
+          end: 32,
+        ),
+      ),
+    )
+    raw(
+      read("samples/note.yml"),
+      block: true,
+      lang: "yaml",
+    )
+  },
+)
+
 
 === Data types
 
