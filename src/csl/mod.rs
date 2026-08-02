@@ -3803,7 +3803,7 @@ mod tests {
     #[cfg(feature = "archive")]
     /// A webpage with only a year (no month/day) as its issued date must not render a dangling delimiter before the (empty) month/day part.
     ///
-    /// See https://github.com/typst/typst/issues/5488
+    /// See https://github.com/typst/hayagriva/issues/246
     fn issue_year_only_date_apa() {
         let yaml = r#"
         nistCVE:
