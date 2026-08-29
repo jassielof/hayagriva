@@ -3799,6 +3799,60 @@ mod tests {
         assert_eq!(c1, "Downs (1957)");
         assert_eq!(c2, "Brady & Collier (2010)");
     }
+
+    #[test]
+    #[cfg(feature = "archive")]
+    /// A webpage with only a year (no month/day) as its issued date must not render a dangling delimiter before the (empty) month/day part.
+    ///
+    /// See https://github.com/typst/hayagriva/issues/246
+    fn issue_year_only_date_apa() {
+        let yaml = r#"
+        nistCVE:
+            type: Web
+            author: "NIST"
+            title: "CVE-2021-44228"
+            date: "2021"
+            url:
+                value: "https://nvd.nist.gov/vuln/detail/CVE-2021-44228"
+                date: 2024-10-28
+        "#;
+
+        let library = from_yaml_str(yaml).unwrap();
+        let apa = archive::ArchivedStyle::AmericanPsychologicalAssociation.get();
+        let citationberg::Style::Independent(apa) = apa else { unreachable!() };
+        let locales = archive::locales();
+
+        let mut driver = BibliographyDriver::new();
+        driver.citation(CitationRequest::new(
+            vec![CitationItem::with_entry(library.iter().next().unwrap())],
+            &apa,
+            None,
+            &locales,
+            None,
+        ));
+
+        let finished = driver.finish(BibliographyRequest {
+            style: &apa,
+            locale: None,
+            locale_files: &locales,
+        });
+
+        let mut bib_entry = String::new();
+        finished
+            .bibliography
+            .unwrap()
+            .items
+            .remove(0)
+            .content
+            .write_buf(&mut bib_entry, BufWriteFormat::Plain)
+            .unwrap();
+
+        assert_eq!(
+            bib_entry,
+            "NIST. (2021). CVE-2021-44228. https://nvd.nist.gov/vuln/detail/CVE-2021-44228"
+        );
+    }
+
     #[test]
     #[cfg(feature = "archive")]
     /// See https://github.com/typst/hayagriva/issues/48
