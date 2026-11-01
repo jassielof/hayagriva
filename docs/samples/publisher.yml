@@ -1,6 +1,0 @@
-book:
-    type: Book
-    title: Automata Studies
-    publisher:
-        name: Penguin Books
-        location: London
