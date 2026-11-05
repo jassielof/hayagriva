@@ -1,0 +1,8 @@
+movie:
+    type: Video
+    title: Terminator 2
+    affiliated:
+        - role: Director
+          names: Cameron, James
+        - role: CastMember
+          names: ["Schwarzenegger, Arnold", "Hamilton, Linda", "Patrick, Robert"]
