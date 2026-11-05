@@ -1,3 +1,630 @@
 = Hayagriva Crosswalk
-:toc: auto
+:description: Conversion rules for Hayagriva, BibLaTeX, BibTeX, and Citation File Format.
+:toc: left
+:toclevels: 3
+:sectnums:
+:sectanchors:
+:source-highlighter: highlight.js
 
+== Scope
+
+This document specifies bibliographic correspondences between Hayagriva and three external formats: BibLaTeX, traditional BibTeX, and Citation File Format (CFF). It defines conversion in both directions, including type selection, field placement, publication relationships, value transformations, and information that cannot be represented.
+
+This is a crosswalk specification for independent implementations. It complements the link:file-format.md[Hayagriva file format]; it does not describe a particular library, programming language, interface, or release's conversion behavior. Conformance to this crosswalk does not imply that a particular application supports every conversion described here.
+
+The words *MUST*, *MUST NOT*, *SHOULD*, *SHOULD NOT*, and *MAY* express requirements of this crosswalk. A recommendation admits a justified alternative; a requirement does not. Source-format validation and target-format validation remain governed by the respective format specifications.
+
+.Format contracts
+[cols="1,2,3",options="header"]
+|===
+|Contract |Authority |Meaning of strict output
+|Hayagriva |link:file-format.md[Hayagriva file format] |Only documented entry types, fields, and value representations; nested bibliographic parents.
+|BibLaTeX |<<biblatex>>: default data model, version 3.22a |Declared types, fields, value types, and relationships, including recognized types without dedicated standard-style drivers. A package-specific data model requires a separately declared extension profile.
+|BibTeX |<<bibtex>>: traditional standard styles |Standard types and per-type fields, with `key` and `crossref`. Modern DOI, URL, and package-specific fields are outside this contract even when a BibTeX parser accepts them.
+|CFF |<<cff-guide>> and <<cff-schema>>: version 1.2.0 |A schema-valid `CITATION.cff` document, or an explicitly identified reference object for use inside such a document. These are different output shapes.
+|===
+
+Format validity, bibliography-style support, and information preservation are separate properties. For example, BibLaTeX recognizes `video` even when a selected style formats it with a generic driver. A strict traditional BibTeX record cannot acquire a `doi` field merely because a modern style understands it.
+
+== General conversion rules
+
+=== Direction, context, and loss
+
+A conversion request MUST identify the source format, target format, and target record shape. A CFF request MUST distinguish a whole document from a reference object. An export of a collection to a single CFF document additionally requires selection of the software or dataset described by its root.
+
+A converter MUST distinguish absent values from present but invalid values. It MUST NOT invent authors, dates, publishers, degrees, relationships, or identifiers to satisfy target requirements. Identical duplicate values MAY be represented once; conflicting values MUST be resolved explicitly. Values attached to different bibliographic entities are not duplicates merely because their field names agree.
+
+The following loss policies apply independently of the selected format:
+
+[cols="1,4",options="header"]
+|===
+|Policy |Behavior
+|`error` (default) |Reject a conversion that would omit populated bibliographic information, reduce its precision, collapse a meaningful classification, or choose between ambiguous relationships.
+|`omit` (explicit) |Permit documented omissions and classification fallbacks, with a diagnostic for each loss.
+|`text` (explicit) |Permit selected unsupported values to become human-readable text in an allowed note-like target field, with a diagnostic for lost structure. The template and source labels MUST be documented. Other losses still require explicit handling.
+|===
+
+Every successful output MUST satisfy the selected target contract. A loss policy MUST NOT authorize forbidden fields, invalid values, unresolved references, or fabricated required data. A diagnostic MUST identify the source record, field or parent path, reason, target limitation, and action taken. Absence of data already lost before conversion cannot be repaired by the crosswalk.
+
+A converter MAY keep a separate preservation record containing source-only metadata and explicit relationship selections. Such a record is not part of a standard Hayagriva bibliography. It MUST NOT be disguised as arbitrary Hayagriva YAML keys, topical `genre` values, or invented identifier schemes. Use of preserved information on later export MUST be explicit and validated against the new target.
+
+=== Hayagriva fields and boundaries
+
+Hayagriva entries contain the following documented fields. The per-format tables account for each field, including those without a counterpart.
+
+[cols="1,3",options="header"]
+|===
+|Group |Fields
+|Identity and description |`type`, `title`, `author`, `date`, `abstract`, `genre`, `note`
+|Relationships and contributors |`parent`, `editor`, `affiliated`
+|Publication |`publisher`, `location`, `organization`, `edition`, `issue`, `volume`, `volume-total`, `chapter`
+|Extent |`page-range`, `page-total`, `time-range`, `runtime`
+|Discovery and identification |`url`, `serial-number`, `language`, `archive`, `archive-location`, `call-number`
+|===
+
+Hayagriva has no standard `keywords`, license, contact, arbitrary custom-field, or key-based `crossref` field. The fact that YAML permits arbitrary mappings does not extend the Hayagriva schema. An unrecognized source field has no implicit native counterpart.
+
+The `serial-number` dictionary provides named identifiers, not a general metadata store. A scalar serial number is treated as an unqualified `serial` identifier for crosswalk purposes. Identifier strings MUST retain leading zeros and significant punctuation. A version identifier MAY use the `version` key; this does not make it equivalent to an edition.
+
+=== Publication roles and parent selection
+
+The following symbols identify semantic roles, not fixed positions in a `parent` sequence:
+
+[cols="1,3",options="header"]
+|===
+|Symbol |Meaning
+|I |The work being cited.
+|P |Its selected publication container: a periodical, book, anthology, reference work, proceedings, or other containing publication.
+|M |An explicitly identified multivolume whole containing the selected volume.
+|S |An explicitly identified publication series.
+|C |An associated conference or presentation event.
+|O |The original publication of a republished work.
+|B |The publication whose production metadata is being flattened: P for a contribution, otherwise I.
+|===
+
+A converter MUST select parents by bibliographic meaning and type. It MUST NOT treat every first parent as a publication container, every same-type ancestor as a series, or every association as containment. Multiple parents can describe alternative publication circumstances. Selecting one MUST NOT silently combine incompatible editions, publishers, dates, or identifiers from the others.
+
+When importing flat publication metadata, create a parent only when the source identifies that bibliographic entity or a containing publication is required by the source type. A series and a multivolume whole MAY have the same Hayagriva type as the contained publication; when their roles cannot be determined from the bibliography, export requires explicit selection.
+
+For flat output, put selected parent metadata in the target's container fields. This preserves containment without requiring a separate cross-referenced record. Flattening is not itself a loss; loss occurs when distinct entities or their metadata can no longer be distinguished. Source citation keys, YAML anchors, and equal titles do not establish parent identity.
+
+`volume`, `issue`, and `page-range` describe position within a containing work and SHOULD be placed on I when imported as locators. Production fields such as a book publisher belong on the described publication. Native bibliographies MAY place volume and issue information on a publication parent; export MUST accept either placement when its meaning is unambiguous. Unequal candidates MUST NOT be resolved by a generic recursive first-value rule.
+
+=== Text, names, numbers, and dates
+
+Text conversion MUST preserve Unicode content. TeX escaping, case-protection braces, and mathematical markup MUST be interpreted according to their source syntax, not copied as arbitrary literal text into a different markup language. A converter MUST NOT infer a subtitle by splitting a title at punctuation. Native short forms and case-protection instructions without target counterparts require loss handling.
+
+Person lists MUST retain order. Family name, given name, prefix, suffix, and alias are distinct native properties. Corporate names MUST remain literal names rather than being split into personal name parts. A name's spelling alone is insufficient to infer whether it identifies a person or organization; ambiguous export requires an explicit interpretation. Contributor roles MUST NOT be silently reassigned to author or editor.
+
+Numeric text MUST NOT be forced into an integer when it is a label, identifier, range, or value with an affix. Normalizing a recognized numeric spelling is permitted only when its bibliographic meaning is preserved. Page counts, page locators, volume counts, and volume numbers are different quantities.
+
+Dates MUST retain their available precision. A year-only date MUST NOT become January 1. Intervals, seasons, uncertainty, approximation, or dates outside the target's supported range require an exact supported representation or loss handling. This crosswalk does not authorize replacing a date interval with one endpoint. Access, publication, release, and event dates MUST NOT be substituted for each other.
+
+== BibLaTeX crosswalk
+
+=== Entry types
+
+The table specifies BibLaTeX-to-Hayagriva type selection. Reverse selection uses the same correspondence only when the native type and parent context establish the source concept. A broader native type does not retain every source subtype; collapsing a meaningful subtype requires loss handling.
+
+[cols="2,2,3",options="header"]
+|===
+|BibLaTeX type |Hayagriva representation |Reverse selection and qualifications
+|`article` |`article` in `periodical` |Use `journaltitle` for the periodical. A newspaper article can use a `newspaper` parent.
+|`book`, `mvbook` |`book` |Select `mvbook` only for an identified whole multivolume set, not a volume with a same-type parent.
+|`inbook`, `bookinbook` |`chapter` in `book`; `book` in `book` for an independently published contained book |Use `bookinbook` only when independent publication is established.
+|`collection`, `mvcollection` |`anthology` |Select the multivolume type only for an identified whole set.
+|`incollection` |`anthos` in `anthology` |Contribution authors/title differ from container editors/title.
+|`reference`, `mvreference` |`reference` |Dictionary or encyclopedia; the multivolume distinction needs context.
+|`inreference` |`entry` in `reference` |A separately identified reference-work contribution.
+|`proceedings`, `mvproceedings` |`proceedings` |An event can be represented separately by C.
+|`inproceedings`, `conference` |`article` in `proceedings` |Export uses `inproceedings`. The alias `conference` never means a native conference event.
+|`periodical` |`periodical` |BibLaTeX describes an issue; whole-publication versus issue granularity must be retained in context.
+|`suppbook`, `suppcollection`, `suppperiodical` |`misc` in the matching container |Supplementation is not fully expressed by native `misc`; reverse selection requires context.
+|`manual` |`reference` |Use `manual` only for known documentation; do not infer it from all reference works.
+|`booklet` |`misc` |Booklet classification is not retained by `misc` alone.
+|`report`, `techreport` |`report` |The legacy alias supplies a technical-report genre if none is supplied.
+|`thesis`, `mastersthesis`, `phdthesis` |`thesis` |Preserve degree/type as `genre`; legacy aliases establish master's or doctoral classification.
+|`unpublished` |`manuscript` |Publication state may require further context.
+|`patent` |`patent` |Keep jurisdiction distinct from publication location.
+|`online`, `electronic`, `www` |`web`, or a more precise native online type when established |A URL alone does not turn a book or article into an online-only work.
+|`software`, `dataset` |`repository` for an identified code/data repository; otherwise `misc` |Software versus dataset classification is not independently retained; reverse selection requires it.
+|`artwork`, `image` |`artwork` |Use `artwork` unless image-specific classification is available.
+|`audio`, `music`, `video`, `movie` |`audio` or `video` |Specific musical or cinematic subtypes need context; generic reverse selection uses `audio` or `video`.
+|`jurisdiction`, `legislation`, `letter`, `performance` |`case`, `legislation`, `letter`, `performance` |Default-model types, even without a dedicated style driver.
+|`review`, `standard`, `commentary`, `legal`, `bibnote`, `customa` through `customf` |A semantically established native type, otherwise `misc` |Specific source classification requires external preservation or a loss diagnostic.
+|`set`, `xdata` |No citable-item equivalent |Resolve data inheritance separately. Set membership and data-container identity are not publication parents.
+|===
+
+On Hayagriva export, `blog`, `post`, and `thread` can use `online` when intrinsically online. An `article` in a blog can also use `online` with loss handling for unsupported container detail. A `newspaper` as the cited item can use `periodical` only when it describes an issue. `scene`, `exhibition`, `conference`, and a separately cited `original` have no exact general BibLaTeX type; use an explicitly selected classification or an acknowledged `misc` fallback. An `original` parent instead supplies original-publication metadata.
+
+=== Fields
+
+Unless qualified, rows are bidirectional semantic correspondences. The selected type and target datatype MUST also permit the field. Source components in one row MUST NOT overwrite independently populated fields.
+
+[cols="2,2,3",options="header"]
+|===
+|BibLaTeX field |Hayagriva field/entity |Rule
+|Entry key |Citation key |Preserve valid unique keys; record necessary renaming. The separate `key` field is not this identifier.
+|`title`, `shorttitle` |`I.title.value`, `I.title.short` |Short title requires full-title context.
+|`subtitle`, `titleaddon` and container equivalents |No separate native title components |Declared composition into a full title needs loss handling for boundaries. Do not infer components from a composed title.
+|`journaltitle`, `shortjournal` |`P.title`, `P.title.short` |For an article in a periodical.
+|`booktitle`, `bookauthor` |`P.title`, `P.author` |For contributions where source semantics permit book authors.
+|`maintitle`, `volumes` |`M.title`, `M.volume-total` |A titled multivolume whole; does not require a numbered selected volume.
+|`volumes` on a whole `mv*` record |`I.volume-total` |Keep the count even without a multivolume parent.
+|`series`, `shortseries` |`S.title`, `S.title.short` |Select series separately from M; resolve ambiguous same-type ancestors.
+|`issuetitle`, `issuesubtitle` |Title of a selected issue between article and periodical |Do not replace the periodical's main title. Title-component composition needs loss handling.
+|`author` |`I.author` |Ordered persons.
+|`editor`, `editora`, `editorb`, `editorc` |`editor` or `affiliated` on the entity being edited |Container editors belong to that publication, not automatically I.
+|Dedicated contributor fields |`I.affiliated` |Same semantic role; see contributor rules.
+|`date`; legacy `year`, `month` |`I.date` |Explicit date and components must agree. Unsupported ranges and qualifiers need loss handling.
+|`eventtitle`, `eventdate`, `venue` |`C.title`, `C.date`, `C.location` |Separate event from publication.
+|`origtitle`, `origdate`, `origpublisher`, `origlocation` |`O.title`, `O.date`, `O.publisher.name`, `O.publisher.location` |Use an `original` parent.
+|`edition` |`B.edition` |Numeric or descriptive edition.
+|`volume` |Volume locator on I or the identified volume |Resolve hierarchy level explicitly if multiple nodes have values.
+|`number`, `issue` |`issue` or `serial-number.serial` on the described entity |Issue/series position versus report/patent record number depends on type. Both populated fields MUST NOT collapse into one without loss handling.
+|`eid` |`I.serial-number.serial` |Article identifier, not pages; report identifier conflicts.
+|`chapter`, `pages`, `pagetotal` |`I.chapter`, `I.page-range`, `B.page-total` |Unit number, occupied pages, total extent.
+|`publisher`, `location` |`B.publisher.name`, `B.publisher.location` |For publication places. Patent jurisdiction can instead use `I.location` in its patent context.
+|`institution`, `organization` |`organization` on the described entity |Choose the source field according to institution versus organization semantics. Different organizations MUST NOT replace each other.
+|`type` |`I.genre` |Bibliographic subtype, not keywords.
+|`note`, `annotation`, `addendum`, `howpublished` |`note` on the described entity |Distinct source functions are not interchangeable. Labeled composition requires loss handling; do not reverse-parse prose.
+|`abstract` |`I.abstract` |Preserve content and account for unsupported markup.
+|`url`, `urldate` |`I.url.value`, `I.url.date` |URL and access date; an access date without a usable URL has no exact qualified-URL counterpart.
+|`doi`, `isbn`, `issn`, `isan`, `ismn`, `iswc`, `isrn`, `version` |Same-named `serial-number` keys |Attach to the identified entity; container identifiers need not become item identifiers.
+|`eprint`, `eprinttype`, `eprintclass` |Named `serial-number` scheme |`arxiv` maps to `arxiv`; `pubmed` to `pmid`. Other schemes need an explicit scheme mapping. Unrepresented service/class information requires loss handling.
+|`language`, `langid` |`I.language` |A single Unicode language identifier. Description, localization, and multiple-language distinctions require exact mappings or loss handling.
+|`keywords`, `file`, sorting/label fields, rights, custom metadata |No general counterpart |Explicit loss/preservation rules apply; do not repurpose existing fields automatically.
+|No universal default field |`archive`, `archive-location`, `call-number`, `time-range`, `runtime` |Declare an extension outside strict output or apply loss handling.
+|===
+
+Aliases `journal`, `address`, `school`, `annote`, `archiveprefix`, and `primaryclass` correspond to `journaltitle`, `location`, `institution`, `annotation`, `eprinttype`, and `eprintclass`. Disagreeing canonical and alias values MUST be resolved, not concatenated.
+
+=== Contributors and values
+
+`translator`, `annotator`, `commentator`, `holder`, `afterword`, `foreword`, and `introduction` map to same-named affiliated roles. Ordinary editors map to `editor`; typed editor lists can express `compiler`, `founder`, `collaborator`, `organizer`, and `director`. `continuator`, `redactor`, and `reviser` have no exact native role; treating them as ordinary editors is a declared loss. Producer, scriptwriter, and performer conventions require an explicit style profile. Other native roles require an exact declared representation or loss handling. The four editor slots MUST NOT silently discard additional groups.
+
+Name options that fold particles into family names or control sorting are not automatically native name parts. Literal names require protective TeX braces on output. Math and case-protection syntax MUST be converted semantically. BibLaTeX `langid` requires a vocabulary mapping; arbitrary Unicode language tags MUST NOT be assumed valid localization names.
+
+Publisher and organization fields can be literal lists. Joining them into one native string loses boundaries and requires loss handling. Do not split a native publisher name at commas to recreate a list; preserve an unambiguous single name as one element.
+
+=== Relationships
+
+Flat records are the default output. An optional relationship representation MAY promote a selected publication parent to a separately keyed record. `crossref` establishes a relationship and inherits data; `xref` establishes a relationship without inheritance; `xdata` inherits data without establishing a publication relationship. These meanings MUST NOT be substituted for each other. C, S, and O are not automatically additional crossrefs. Sets and `related` relationships require explicit selections beyond generic parenthood.
+
+Promoted parents MUST receive unique keys, reserving original citation keys first. Equal titles or nested keys MUST NOT trigger deduplication. References MUST resolve, cycles MUST be rejected, and effective child data after inheritance MUST match the selected fields. Field transfer follows BibLaTeX's rules, not an assumed same-name copy.
+
+=== Target requirements
+
+BibLaTeX requirements and omissible-data qualifications follow <<biblatex>>, sections 2.1.1 and 2.3.2. For example, `book` does not require a publisher; `report` and `thesis` require an appropriate `type` and institution in their declared data requirements; `unpublished` has an optional note. Missing-data exceptions depend on type and citation style. A converter MUST validate the chosen target instead of imposing traditional BibTeX requirements on BibLaTeX.
+
+== Traditional BibTeX crosswalk
+
+=== Entry types and title semantics
+
+This contract follows the traditional standard styles, not BibLaTeX's interpretation of the same `.bib` syntax.
+
+[cols="2,2,3",options="header"]
+|===
+|BibTeX type |Hayagriva representation |Hayagriva-to-BibTeX rule
+|`article` |`article` in `periodical` or `newspaper` |Use the selected publication's title as `journal`.
+|`book` |`book`; `anthology` for an established edited collection |An anthology exports as `book`, with loss handling for classification.
+|`booklet` |`misc` |Reverse selection requires booklet context; native `misc` alone cannot establish it.
+|`inbook` |A book portion located by `chapter` and/or `page-range` |`title` and author/editor describe the book. A separately titled native `chapter` normally exports as `incollection`, not traditional `inbook`.
+|`incollection` |`anthos` in `anthology`, or a titled `chapter` in `book` when established |Contribution title goes in `title`, containing work in `booktitle`. Source type alone does not distinguish all native contribution types.
+|`inproceedings`, `conference` |`article` in `proceedings` |Export uses `inproceedings`; never use `conference` for a native event.
+|`manual` |`reference` describing documentation |Other `reference` works can use `book` with acknowledged classification loss.
+|`mastersthesis`, `phdthesis` |`thesis` with degree in `genre` |An unknown degree MUST NOT be assumed doctoral; require explicit selection or an acknowledged `misc` fallback.
+|`proceedings` |`proceedings` |An event is not the published proceedings.
+|`techreport` |`report` |Preserve a known report subtype through `type`.
+|`unpublished` |`manuscript` |Requires a note in standard BibTeX.
+|`misc` |`misc` |Used for genuinely miscellaneous works or explicitly acknowledged fallback.
+|===
+
+On export, `entry` in `reference` can use `incollection`; an independently titled `book` in another book can also use `incollection`. Whole `periodical` and `newspaper` items, `web`, `blog`, `post`, `thread`, `repository`, `patent`, `scene`, `artwork`, `case`, `legislation`, `performance`, `conference`, `video`, `audio`, `exhibition`, `original`, `letter`, and contributions without a usable container have no exact standard type. They require an explicit supported classification or an acknowledged `misc` fallback. Do not emit BibLaTeX-only `online`, `report`, `thesis`, `collection`, `inreference`, `patent`, or `mv*` types under this contract.
+
+Traditional `inbook` has no separately titled contribution: its `title` is the book title. Import SHOULD use a native `book` with `chapter`/`page-range` locators when that is all the source identifies. A converter MUST NOT invent a chapter title or an empty publication parent to imitate BibLaTeX `inbook`.
+
+=== Fields
+
+[cols="2,2,3",options="header"]
+|===
+|BibTeX field |Hayagriva field/entity |Rule
+|Entry key |Citation key |Preserve or explicitly rename; not the separate sorting field `key`.
+|`title` |`I.title` |For traditional `inbook`, I describes the book portion using the book's identity as explained above.
+|`journal`, `booktitle` |`P.title` |Periodical or containing publication respectively.
+|`author`, `editor` |Authors/editors of the described work |Container editors for a contribution belong on P. Do not merge conflicting root and container lists.
+|`year`, `month` |`I.date` |Use a recognized month abbreviation on export. Day precision has no standard separate field; preserve only with explicit text fallback or report loss.
+|`publisher`, `address` |`B.publisher.name`, `B.publisher.location` |Except proceedings `address`, which identifies the event location under standard-style rules.
+|Proceedings `address` |`C.location` |Keep publisher location separate; output cannot silently choose between locations competing for one field.
+|`institution`, `school`, `organization` |`organization` on the described entity |Report sponsor, thesis institution, manual/conference organization respectively.
+|`edition` |`B.edition` |Recognized ordinal strings can map to numbers; numeric export SHOULD use a suitable ordinal word for traditional styles.
+|`volume`, `number` |Volume/issue/series locator; `serial-number.serial` for reports |Meaning depends on entry type. Leading zeros in record numbers are significant.
+|`series` |`S.title` |Numbering stays associated with the selected series/volume context.
+|`chapter`, `pages` |`I.chapter`, `I.page-range` |Export ranges with `--` and disjoint ranges separated by commas.
+|`type` |`I.genre` |Only where the selected type supports it.
+|`note`, `howpublished` |`note` on the described entity |Independent values require explicit labeled composition and loss handling; do not silently overwrite.
+|`key` |No citation-key equivalent |Sorting/label fallback, not bibliographic identity; apply loss handling if populated.
+|`crossref` |Selected publication parent after inheritance resolution |Preserve container meaning independently of source field inheritance syntax.
+|No standard-style field |`title.short`, `abstract`, `affiliated`, `volume-total`, `page-total`, `time-range`, `runtime`, `language`, `archive`, `archive-location`, `call-number` |Apply loss handling. Other role lists MUST NOT be recast as editors.
+|No standard-style field |`url` and its access date; named `serial-number` schemes such as DOI/ISBN/ISSN/version/arXiv |Strict output MUST NOT emit extension fields. The permitted text policy can use `note` or `howpublished` only where allowed.
+|No universal field |Standalone native `location`; O's original-publication metadata |Use a matching standard context only when its meaning is exact; otherwise apply loss handling.
+|===
+
+=== Required fields and allowlists
+
+The following table is the ordinary-field allowlist for strict output. Every type also permits `key` and a validated `crossref`. Source syntax may accept additional fields, but this does not make them part of the strict standard-style contract.
+
+[cols="1,2,3",options="header"]
+|===
+|Type |Required |Optional
+|`article` |`author`, `title`, `journal`, `year` |`volume`, `number`, `pages`, `month`, `note`
+|`book` |`author` or `editor`; `title`, `publisher`, `year` |`volume` or `number`, `series`, `address`, `edition`, `month`, `note`
+|`booklet` |`title` |`author`, `howpublished`, `address`, `month`, `year`, `note`
+|`inbook` |`author` or `editor`; `title`, `chapter` and/or `pages`, `publisher`, `year` |`volume` or `number`, `series`, `type`, `address`, `edition`, `month`, `note`
+|`incollection` |`author`, `title`, `booktitle`, `publisher`, `year` |`editor`, `volume` or `number`, `series`, `type`, `chapter`, `pages`, `address`, `edition`, `month`, `note`
+|`inproceedings` |`author`, `title`, `booktitle`, `year` |`editor`, `volume` or `number`, `series`, `pages`, `address`, `month`, `organization`, `publisher`, `note`
+|`manual` |`title` |`author`, `organization`, `address`, `edition`, `month`, `year`, `note`
+|`mastersthesis`, `phdthesis` |`author`, `title`, `school`, `year` |`type`, `address`, `month`, `note`
+|`misc` |None |`author`, `title`, `howpublished`, `month`, `year`, `note`
+|`proceedings` |`title`, `year` |`editor`, `volume` or `number`, `series`, `address`, `month`, `organization`, `publisher`, `note`
+|`techreport` |`author`, `title`, `institution`, `year` |`type`, `number`, `address`, `month`, `note`
+|`unpublished` |`author`, `title`, `note` |`month`, `year`
+|===
+
+`conference` is an alias for `inproceedings`. Volume/number exclusions and required alternatives MUST be validated. `annote`, `abstract`, `keywords`, `doi`, `url`, `isbn`, `issn`, and `urldate` are outside this output contract. A custom bibliography style requires a separately named extension profile.
+
+=== Cross-references and values
+
+Self-contained records are the default. Optional crossref output MUST select at most one publication parent, emit it after every referencing child, and avoid nested crossrefs. The standard mechanism inherits same-named missing fields; it does not automatically rename parent `title` to child `booktitle`. A proceedings record MAY therefore carry a `booktitle` field specifically for child inheritance, the documented exception to the ordinary parent allowlist (<<bibtex>>, section 2.2, item 3).
+
+Generated keys MUST be unique and relationships MUST resolve. Multiple parents MUST NOT become multiple `crossref` fields. Traditional crossref processing can add a sufficiently referenced parent to the bibliography; choosing this representation therefore has a rendering consequence. Events, series, and original-publication relationships MUST be flattened where exact fields exist or handled under the loss policy. BibLaTeX `xref` and `xdata` MUST NOT be emitted.
+
+Personal names require BibTeX-compatible name syntax and `and` separators. Literal corporate names require an extra protective brace level. TeX character escaping, protected capitalization, and numeric page-range formatting MUST preserve content. A conforming converter MUST handle Unicode through an explicitly supported TeX/encoding representation rather than silently transliterating names or titles. Source macros, comments, preambles, and original brace layout are not bibliographic values and need not be reconstructed.
+
+== Citation File Format crosswalk
+
+=== Document and reference shapes
+
+CFF 1.2.0 has two distinct shapes:
+
+* A document root describes software or a dataset. `cff-version`, `message`, `title`, and a nonempty `authors` array are required. Root `type` is `software` or `dataset`; omission means `software`. A complete output document MUST be named `CITATION.cff`.
+* A reference object describes a bibliographic work inside `preferred-citation` or `references`. It requires `type`, `title`, and a nonempty `authors` array. Its type vocabulary and fields are broader than the root's. A reference object alone MUST NOT be presented as a complete `CITATION.cff` document.
+
+A Hayagriva-to-CFF document conversion MUST select one software/dataset work for the root and establish its classification explicitly. `repository` alone does not distinguish software from data, and native `misc` is not evidence of software. Other native works MAY be exported as reference objects only in a caller-selected document context. A converter MUST NOT invent a software wrapper around an unrelated book or bibliography.
+
+The output `cff-version` MUST be `1.2.0`. `message` is document-level citation guidance, not a work's bibliographic note. It MUST be supplied by the document author or by an explicitly selected documented template, such as `Please cite this software using the metadata from this file.` A template MUST reflect any selected preferred-citation policy and MUST NOT imply author instructions that were inferred from bibliography contents.
+
+=== Citation relationships and keys
+
+`preferred-citation` means a work that should receive citation credit instead of the root software/dataset. `references` lists works on which that root work builds. Neither relation means publication containment. Import MUST NOT turn either relation into a native `parent`. Export MUST NOT turn publication parents, arbitrary bibliography siblings, or related papers into `references` or `preferred-citation` automatically.
+
+Three import selections are defined:
+
+[cols="1,4",options="header"]
+|===
+|Selection |Meaning
+|Root (default) |Import the root software/dataset's bibliographic metadata. Unrepresented document guidance, credit redirection, and references remain subject to the selected loss policy.
+|Preferred |Import the explicitly selected `preferred-citation` object. Fail if absent; do not silently substitute root metadata. Report that this selection does not import the root work.
+|All |Import root, preferred citation when present, and every selected reference as separate native records. Their credit/dependency relationships still need an external preservation record or loss handling.
+|===
+
+No selection permits mixing root authors/title with preferred-citation DOI, year, or publisher. CFF has no native Hayagriva citation-key field. The caller SHOULD assign keys; otherwise the converter MUST document deterministic key generation based on document identity and object path and resolve collisions. A DOI, URL, title, or a reference's `number` MUST NOT be mistaken for a pre-existing citation key. Export does not add an undeclared `key` property to CFF.
+
+=== Entry types
+
+The table covers all CFF reference types. The CFF column names _reference-object_ types unless marked root. Broad-to-specific choices require contextual evidence; meaningful source subtypes lost in the native type require loss handling.
+
+[cols="2,2,3",options="header"]
+|===
+|CFF type |Hayagriva representation |Reverse selection
+|Root `software`; reference `software`, `software-code`, `software-container`, `software-executable`, `software-virtual-machine` |`repository` for an identified code repository; otherwise `misc` |Require software classification. Root uses `software`; reference uses the known subtype or `software` with loss handling for any subtype reduction.
+|Root `dataset`; reference `data`, `database` |`repository` for an established data repository; otherwise `misc` |Root uses `dataset`, never `data`. Reference uses `data` or `database` only when established.
+|`article`, `magazine-article`, `newspaper-article` |`article` with appropriate `periodical` or `newspaper` parent |Use the known subtype; `article` is the general reference type.
+|`conference-paper` |`article` in `proceedings`, and/or C for a presented paper |Do not infer published proceedings solely from a conference presentation.
+|`book`, `edited-work` |`book`, `anthology` |Use `edited-work` for an edited whole; contribution handling is specified below.
+|`dictionary`, `encyclopedia`, `manual`, `standard` |`reference` |Specific reverse classification requires context; do not infer a manual from all reference works.
+|`proceedings`, `conference` |`proceedings`, `conference` |Unlike BibTeX/BibLaTeX `conference`, CFF `conference` describes an event.
+|`serial` |`periodical` or `newspaper` |Source granularity must identify a serial or issue, rather than a contained article.
+|`report`, `government-document` |`report` |Government classification needs context on reverse conversion.
+|`thesis` |`thesis` |Use `thesis-type` for a degree/type.
+|`unpublished` |`manuscript` |Publication status distinctions require separate handling.
+|`patent` |`patent` |Jurisdiction and patent identifiers remain distinct.
+|`legal-case` |`case` |A legal case, not a generic statute.
+|`bill`, `legal-rule`, `statute` |`legislation` |Specific legislative subtype needs context.
+|`art`, `map` |`artwork` |Map classification requires context on reverse conversion.
+|`audiovisual`, `film-broadcast`, `multimedia`, `video` |`video` when audiovisual meaning is established; otherwise `misc` |Do not infer a whole video from every multimedia work or scene.
+|`music`, `sound-recording` |`audio` for recorded sound; `performance` for an established live event |A score or other musical work without a matching native category needs explicit classification or fallback.
+|`personal-communication` |`letter` |Sender and recipient roles are not ordinary coauthors.
+|`blog`, `website` |`blog`, `web` |Native `post`/`thread` can use `website` only as an acknowledged broader classification; a blog article is handled as a contained article.
+|`catalogue`, `grant`, `hearing`, `historical-work`, `pamphlet`, `slides` |Known semantic native type, otherwise `misc` |Do not guess one of these specific types from `misc`, `genre`, or title text alone.
+|`generic` |`misc` |Fallback requires explicit loss acceptance unless the native item is genuinely miscellaneous.
+|===
+
+CFF has no general reference type specifically named book chapter. A native `chapter`, `anthos`, or `entry` MUST use an explicitly established supported reference type and container/entry metadata, or an acknowledged `generic` fallback. It MUST NOT be relabeled as a whole `book` merely to obtain a valid enum value. CFF `entry` and `term` fields do not themselves declare an entry type. Native `scene`, `exhibition`, `original`, and `performance` without a matching contextual CFF type likewise require classification or fallback. O as a parent can supply original-publication year; it is not automatically a cited reference.
+
+=== Root fields
+
+This table covers every CFF root key. It is intentionally separate from the reference-field table: keys such as `publisher`, `journal`, `year`, `notes`, and `editors` MUST NOT be emitted at the root.
+
+[cols="2,2,3",options="header"]
+|===
+|CFF root key |Hayagriva correspondence |Conversion rule
+|`cff-version` |None |Document control; emit `1.2.0`, validate on import.
+|`message` |None |Document guidance; supply/preserve separately. Do not map automatically to `note`.
+|`type` |Contextual `repository` or `misc` |Explicit software/dataset classification; see type table.
+|`title` |`I.title.value` |Plain text; short form and formatting controls have no root counterpart.
+|`authors` |`I.author` |Person/entity rules below; a nonempty list is required.
+|`abstract` |`I.abstract` |Plain text; account for any native formatting loss.
+|`date-released` |`I.date` when it describes release |Full calendar date only. A native date needs established release semantics.
+|`version` |`I.serial-number.version` |String representation; not an edition or commit.
+|`doi` |`I.serial-number.doi` |One selected DOI; multiplicity rules below.
+|`identifiers` |Named `I.serial-number` schemes or selected URL |Supported identifier types and descriptions need explicit handling.
+|`url` |`I.url.value` |Landing-page URL. No root access-date field.
+|`repository`, `repository-code`, `repository-artifact` |A selected `I.url.value` with explicit URL role |Native qualified URL has one value and no repository-role tag. Preserve other URLs and roles externally or apply loss handling.
+|`commit` |No standard semantic counterpart |Do not confuse commit with version or invent a serial scheme automatically.
+|`keywords` |None |Do not use `genre`; preserve externally or apply loss handling.
+|`license`, `license-url` |None |No native rights model; do not infer a license from a URL or note.
+|`contact` |None |Contacts are not necessarily authors or affiliated contributors.
+|`preferred-citation` |Separate selected record, with external credit relationship |Not P or O by default.
+|`references` |Separate selected records, with external reference relationships |Not publication parents or arbitrary library siblings.
+|===
+
+All other populated native fields, including `editor`, `affiliated`, `publisher`, `location`, `organization`, `issue`, `volume`, `volume-total`, `chapter`, `edition`, `page-range`, `page-total`, `time-range`, `runtime`, `language`, `archive`, `archive-location`, `call-number`, `genre`, `note`, and `parent`, have no general root field. They MUST NOT be smuggled into an invented root property or a fabricated preferred citation. Use the loss policy or select the reference-object shape when that is the intended task.
+
+=== Reference fields
+
+This table covers the fields of `definitions.reference` in the CFF guide. It applies equally to `preferred-citation` and each `references` element. Their different document relationships remain significant.
+
+[cols="2,2,3",options="header"]
+|===
+|CFF reference key |Hayagriva field/entity |Rule
+|`type` |Contextual native type and parent |Use the type table; do not confuse reference `data` with root `dataset`.
+|`title`, `abbreviation` |`I.title.value`, `I.title.short` |Abbreviation must describe the work, not an unrelated journal abbreviation.
+|`authors` |`I.author` |Ordered nonempty list; person/entity rules below.
+|`editors`, `editors-series` |`editor` on the edited work/container; `S.editor` |Keep work/container editors distinct from series editors.
+|`translators` |`I.affiliated` with role `translator` |Other native roles have no general CFF reference field.
+|`abstract`, `notes` |`I.abstract`, `I.note` |Plain text. `notes` is singular text, despite its plural key.
+|`date-published`, `date-released`, `year`, `month` |`I.date` with established publication/release meaning |Full dates or reduced year/month precision according to the date rules below; independent dates need separate preservation.
+|`date-accessed` |`I.url.date` |Requires a selected native URL; no standalone access-date field.
+|`date-downloaded` |No exact counterpart |Not an access date automatically.
+|`journal` |`P.title` for a periodical/newspaper |Do not replace item title or issue title.
+|`issue`, `volume` |Issue/volume locator on the cited item or selected publication level |Nonempty string or integer as permitted by CFF; keep numeric labels exact.
+|`issue-title`, `issue-date` |Title/date of a selected issue parent |Do not overwrite journal title or item date. A non-calendar issue date needs loss handling if it cannot be represented exactly.
+|`collection-title`, `collection-type`, `collection-doi` |`P.title`, established P type, `P.serial-number.doi` |For a selected collection/proceedings. Do not infer a publication type by arbitrary string matching; documented values such as `proceedings` can establish context.
+|`volume-title`, `number-volumes` |Selected volume's title; selected collection's `volume-total` |Not I's article title or the current volume number. Native standalone whole-set totals need explicit whole-set context on export.
+|`conference` |C with entity name, place, and supported dates |Presentation event; not P. Conference date intervals need loss handling when native dates cannot express them.
+|`publisher` |`B.publisher` |An entity, not a string; map name and publication place according to entity rules.
+|`institution` |`B.organization` |An entity; retain institution role. Do not silently merge a separate publisher.
+|`location` |`I.location` |An entity describing the work's location. Do not treat it as publisher location by default.
+|`edition` |`B.edition` |A string; convert a numeric native edition to an equivalent string.
+|`section` |`I.chapter` when it is the cited unit number |A named/descriptive section can be text; retain the distinction from an independently titled chapter.
+|`start`, `end` |`I.page-range` |A single page or contiguous range; disjoint ranges have no exact two-endpoint representation.
+|`pages` |`I.page-total` for the work whose extent is stated |Total page count, *not* occupied page range. Count/locator ownership MUST be resolved before export.
+|`number` |`I.call-number` when it is an accession number |Not automatically issue number, patent number, or an identifier scheme.
+|`doi`, `isbn`, `issn`, `pmcid`, `nihmsid` |Same-named `serial-number` keys on the identified entity |Validate target patterns; retain string identifiers and leading zeros.
+|`identifiers` |Named identifier schemes/selected URL |Apply identifier rules; descriptions and multiplicity are not implicit native fields.
+|`version` |`I.serial-number.version` |Not an edition or commit.
+|`url`, `repository`, `repository-code`, `repository-artifact` |Selected `I.url.value`, with explicit source role |One native URL cannot retain multiple URLs and their roles without preservation/loss handling.
+|`languages` |`I.language` for one exactly representable language |CFF uses two/three-letter ISO 639 codes, not full Unicode locale identifiers. Multiple languages or native script/region/variant details require loss handling.
+|`thesis-type` |`I.genre` for a thesis |Degree/type, not a general category field for all works.
+|`year-original` |`O.date` at year precision |Does not authorize discarding a more precise native original-publication date.
+|`database`, `database-provider` |`archive`/`archive-location` only when an actual keeping/archive role is established |A database title or provider is not automatically a publication container or physical archive. Other interpretations require explicit selection or preservation.
+|`patent-states` |`I.location` in an established patent-jurisdiction context |Multiple separate jurisdictions cannot be flattened without acknowledging lost structure.
+|`entry`, `term` |An explicitly selected contribution/entry description |No universal separate native field; do not replace a separately populated title or unit number. Composition/fallback requires loss handling.
+|`senders`, `recipients` |No general exact contributor-role counterpart |Do not silently convert recipients into authors. A sender can be an author only when explicitly established as the communication's author.
+|`contact`, `copyright`, `license`, `license-url`, `keywords` |No native counterpart |Separate contact/rights/tag metadata; do not convert automatically into author, genre, or notes.
+|`commit`, `data-type`, `department`, `filename`, `format`, `medium`, `scope`, `status` |No universal native counterpart |Do not equate commit with version, status with genre, or department with an entire organization. Explicit preservation/loss rules apply.
+|`loc-start`, `loc-end` |No native line-of-code locator |Not page numbers or time-range endpoints.
+|No CFF reference counterpart |Native `time-range`, `runtime`; other native genres or archive details lacking an exact contextual mapping |Apply loss handling; a valid reference type does not create additional permitted fields.
+|===
+
+==== Dates, pages, and languages
+
+Every CFF date-valued field uses a full `YYYY-MM-DD` calendar date. Export MUST quote these values as YAML strings. Full publication/release dates map only when the native date's meaning is known. A reference MAY use `year` and `month` for reduced publication precision; a year-only or year/month native date cannot populate root `date-released`. Missing day precision MUST NOT be invented. If full-date and component fields coexist, they MUST agree.
+
+When both `date-published` and `date-released` exist, a single native date can represent both only if they are the same date of the same relevant event under the selected interpretation. Otherwise select one explicitly and preserve/report the other. Access, download, and event dates remain separate. `issue-date` is a free-form issue date and MUST NOT be assumed to be a schema date or silently parsed to an interval endpoint.
+
+`start`/`end` represent occupied pages; `pages` represents total extent. If one page is cited, start and end MAY both contain that page. Open endpoints can be retained only when the target/native representation expresses the same locator; otherwise loss handling applies. Do not subtract endpoints to infer `pages`, and do not put a disjoint range in one endpoint. `loc-start`/`loc-end` locate source-code lines, not pages.
+
+For export to `languages`, a native language with no additional script, region, or variant MAY map to its recognized ISO 639 code. Dropping `-BR` from `pt-BR`, for example, loses information and is not a lossless conversion. On import, choosing one member of a multilingual list requires explicit loss handling; no implicit first-language rule is defined.
+
+==== People and entities
+
+[cols="2,2,3",options="header"]
+|===
+|CFF property |Native correspondence |Rule
+|Person `family-names`, `given-names`, `name-particle`, `name-suffix`, `alias` |Person `name`, `given-name`, `prefix`, `suffix`, `alias` |Keep components separate. If no family-name component exists, require an explicit native name interpretation rather than inventing one.
+|Entity `name`, `alias` in an author/editor list |Literal person-name representation and alias |Corporate versus personal identity is not separately tagged in the native person representation; preserve that distinction externally or report its loss.
+|Entity `name`, `location` for publisher/institution/conference/location |Selected entity's native name/place fields |`publisher` names map to `publisher.name`; institutions to `organization`; conferences to `C.title`; work locations to `location`. CFF entity `name` is required, so exporting a place without a known entity identity requires explicit interpretation or loss handling.
+|Person `affiliation`, `orcid`, `email`, `website`, `address`, `city`, `country`, `region`, `post-code`, `tel`, `fax` |No per-person native counterpart |Do not move personal ORCID/contact identifiers into work serial numbers or use a person's affiliation as the work's organization automatically.
+|Entity `orcid`, `email`, `website`, `address`, `city`, `country`, `region`, `post-code`, `tel`, `fax` |No general structured native counterpart |A declared place composition can preserve readable text but loses address boundaries. Postal address MUST NOT be treated as publication place without context.
+|Entity `date-start`, `date-end` |Selected conference/event date only when exactly representable |Entity lifetime dates are not publication dates. A genuine interval has no exact single-date counterpart.
+|===
+
+The CFF schema permits authors that cannot be represented by the native required name field without interpretation. A converter MUST diagnose such cases. It MUST NOT add an `Unknown` author merely to satisfy a nonempty authors list. The guide's conventions for unknown individual authors do not authorize claiming a person or organization without source evidence.
+
+==== Identifiers and URLs
+
+CFF identifier objects have `type` equal to `doi`, `url`, `swh`, or `other`, with a value and optional description. This is not an arbitrary scheme-key dictionary. A known DOI maps to native `doi`. An established Software Heritage identifier MAY use native scheme `swh`; an untyped `other` value needs an explicit scheme interpretation before it becomes a named native serial number. No universal parsing of free-form identifier descriptions is defined.
+
+For an explicitly selected `other` identifier convention, native arXiv and PubMed identifiers MAY use unambiguous `arXiv:` and `PMID:` prefixes. Other native schemes MUST have a documented value encoding or use loss handling. A converter MUST NOT label an arbitrary string as a DOI or SWH identifier. Native ISBN/ISSN values use their dedicated CFF reference fields; the root has no such fields and needs an explicitly supported `other` encoding or loss handling.
+
+The single native value per identifier scheme cannot represent multiple version/concept DOIs, identifier descriptions, or repeated scheme values. An explicit `doi` and a matching `identifiers` DOI can be deduplicated; different values MUST NOT silently replace each other. Selection of a concept versus release DOI requires explicit source context or caller choice. Known work identifiers MUST NOT be confused with person ORCIDs or collection identifiers.
+
+CFF distinguishes landing-page, repository, source-code, artifact, and identifier URLs. Native `url` provides one URL and an optional access date. When several source URLs exist, the caller MUST select the URL role or preserve all source values outside the native core; taking the first available URL is not a lossless rule. On export a native URL can populate the general `url` field unless another role is explicitly established. It MUST NOT automatically become all four URL fields. Reference `date-accessed` can preserve a known access date; root output cannot.
+
+=== CFF-specific information without a native counterpart
+
+Keywords, licensing, copyright, contact records, commit identity, identifier descriptions, document messages, and preferred-citation/reference relationships are not recoverable from standard native metadata once discarded. `license` arrays in CFF express alternatives (OR), not an implicit conjunction. A converter retaining this information externally MUST preserve that meaning and MUST NOT infer it from a native `note`.
+
+An extended conversion profile MAY accept explicitly supplied external metadata for CFF fields, but MUST validate the complete result against the pinned schema. Root-only and reference-only fields remain distinct. The `text` loss policy cannot invent a root `notes` property; root output may need to fail or use an explicitly permitted omission policy even when a reference object could preserve the same content as `notes`.
+
+== Examples
+
+The examples illustrate the specification, not the output of a particular converter. Synthetic names and identifiers are used only to show syntax. Explicitly supplied document context is identified separately from native metadata.
+
+=== One article, two bibliography targets
+
+.Hayagriva source
+[source,yaml]
+----
+river-paper:
+  type: article
+  title: River measurements
+  author:
+    - name: Doe
+      given-name: Jane
+  date: "2024-05"
+  volume: 12
+  issue: 2
+  page-range: 10-18
+  serial-number:
+    doi: 10.1234/river.example
+  parent:
+    type: periodical
+    title: Journal of Rivers
+----
+
+.Strict BibLaTeX
+[source,bibtex]
+----
+@article{river-paper,
+  author = {Doe, Jane},
+  title = {River measurements},
+  journaltitle = {Journal of Rivers},
+  date = {2024-05},
+  volume = {12},
+  number = {2},
+  pages = {10--18},
+  doi = {10.1234/river.example}
+}
+----
+
+For strict traditional BibTeX, the DOI has no ordinary target field. The default `error` policy rejects this conversion. The following output uses an explicitly selected `omit` policy and requires a diagnostic identifying the omitted DOI. Under `text`, it could instead appear in a documented note template.
+
+.Strict BibTeX with acknowledged DOI omission
+[source,bibtex]
+----
+@article{river-paper,
+  author = {Doe, Jane},
+  title = {River measurements},
+  journal = {Journal of Rivers},
+  year = {2024},
+  month = may,
+  volume = {12},
+  number = {2},
+  pages = {10--18}
+}
+----
+
+Both target `pages` values represent occupied pages, not a page count. A converter importing either record under this crosswalk places the article in its periodical parent; it need not reproduce source field order or abbreviation syntax.
+
+=== A CFF reference object
+
+The same native article can be represented as the following CFF reference object. It has year/month precision, so `date-published` MUST NOT be fabricated. Placement in `references` or `preferred-citation` requires an explicit document relationship.
+
+.CFF reference object; not a complete document
+[source,yaml]
+----
+type: article
+title: River measurements
+authors:
+  - family-names: Doe
+    given-names: Jane
+year: 2024
+month: 5
+journal: Journal of Rivers
+volume: 12
+issue: 2
+start: 10
+end: 18
+doi: 10.1234/river.example
+----
+
+There is no `pages: 10-18`: CFF `pages` would mean total extent. Conversion back can preserve the page range through `start`/`end`, independently of any separately supplied page count.
+
+=== A CFF software document
+
+.Hayagriva source for the root work
+[source,yaml]
+----
+river-tool:
+  type: repository
+  title: River Tools
+  author:
+    - name: Doe
+      given-name: Jane
+  date: "2024-05-12"
+  serial-number:
+    version: "1.0.0"
+  url: https://example.org/river-tools
+----
+
+For this example, the caller explicitly establishes software classification, release-date semantics, and the relationship making `river-paper` the preferred citation. The caller also supplies the citation message. These decisions cannot be inferred solely from the two native records. CFF document construction preserves this supplied context alongside the bibliographic values.
+
+.Complete CITATION.cff
+[source,yaml]
+----
+cff-version: 1.2.0
+message: Please cite the article in preferred-citation when using River Tools.
+type: software
+title: River Tools
+authors:
+  - family-names: Doe
+    given-names: Jane
+date-released: "2024-05-12"
+version: "1.0.0"
+url: https://example.org/river-tools
+preferred-citation:
+  type: article
+  title: River measurements
+  authors:
+    - family-names: Doe
+      given-names: Jane
+  year: 2024
+  month: 5
+  journal: Journal of Rivers
+  volume: 12
+  issue: 2
+  start: 10
+  end: 18
+  doi: 10.1234/river.example
+----
+
+An `All` import creates separate native records for software and paper, with caller-assigned or generated keys. It MUST NOT put the paper under the software's `parent` field. The message and credit-redirection relationship need external preservation or an explicit loss policy. A root-only import MUST NOT substitute the article's title or DOI for the software's metadata.
+
+== Conformance and round-trip expectations
+
+A conforming conversion MUST declare its formats, versions, record shape, loss policy, relationship representation, and any extension profiles. It MUST validate required fields and target value constraints, account for every populated source field, and report unrepresentable information. A conversion MAY produce no output when unresolved issues remain; it MUST NOT label an incomplete or invalid record conforming merely because serialization succeeds.
+
+Semantic round-trip preservation applies only to the representable subset and explicitly retained external context. Exact bytes, comments, source ordering, macro definitions, and brace layout are outside the contract. Classification, name parts, date precision, parent meaning, identifier ownership, and citation relationships are within the contract and MUST NOT disappear without the selected loss handling.
+
+.Required verification cases
+[cols="2,3",options="header"]
+|===
+|Case |Expected result
+|Native DOI to strict BibTeX |Fail under `error`; omit with a diagnostic under `omit`; allowed note template under `text`. Never add `doi`.
+|Keywords from BibLaTeX or CFF |No native tag field. External preservation or explicit loss handling; never use `genre` automatically.
+|Distinct series and multivolume parents |Preserve their separate meanings; ambiguous same-type ancestors require selection.
+|Journal plus issue title |Keep both bibliographic entities; no overwrite of journal title.
+|Date interval or partial CFF release date |No invented date or implicit endpoint selection.
+|Traditional BibTeX `inbook` |Preserve book-title semantics, not a fabricated independently titled chapter.
+|Publication and event parents |Publication fields/crossref and event metadata handled independently.
+|Multiple DOI or URL values |No first-value shortcut; preserve multiplicity externally or apply explicit selection/loss handling.
+|CFF root versus reference |Validate against the correct shape and enum; no root `journal`, `year`, or `notes`.
+|CFF preferred citation and references |Separate selected records; never containment by default.
+|CFF `pages` versus `start`/`end` |Count versus locator preserved; no arithmetic inference.
+|CFF language or personal metadata |No silent removal of locale subtags, affiliation, ORCID, contact details, or entity identity.
+|Additional/custom metadata |No invented standard fields; extensions require separate declaration and validation.
+|===
+
+[bibliography]
+== References
+
+* [[[hayagriva,Hayagriva]]] link:file-format.md[Hayagriva file format]. Native entry types, fields, parents, and values.
+* [[[biblatex,BibLaTeX]]] Philip Kime, Moritz Wemheuer, and Philipp Lehman. link:spec/biblatex.pdf[The biblatex Package], version 3.22a, September 24, 2026. Sections 2.1 (types), 2.2 (fields), 2.3 (usage), 3.4 (names), Appendix A.1 (aliases), and Appendix B (inheritance).
+* [[[bibtex,BibTeX]]] Oren Patashnik. link:spec/btxdoc.pdf[BibTeXing], February 8, 1988. Sections 2.2 (standard-style changes and cross-references), 3.1 (types), and 3.2 (fields).
+* [[[bibtex-styles,BibTeX styles]]] Oren Patashnik. link:spec/btxhak.pdf[Designing BibTeX Styles], February 8, 1988. Section 5: names, case handling, and bibliography processing.
+* [[[bibtex-faq,BibTeX FAQ]]] Michael Shell and David Hoadley. link:spec/btxFAQ.pdf[BibTeX Tips and FAQ], version 1.1, January 2007. Sections 2.3 and 3.3: online references and style limitations.
+* [[[cff-guide,CFF guide]]] link:spec/cff-schema-guide.md[Guide to Citation File Format schema version 1.2.0]. Root keys, reference keys, people, entities, identifiers, and examples. https://citation-file-format.github.io/[CFF project].
+* [[[cff-schema,CFF schema]]] Citation File Format. https://github.com/citation-file-format/citation-file-format/blob/1.2.0/schema.json[JSON Schema, version 1.2.0]. Machine-readable constraints for documents and reference objects; the schema governs validation where guide examples are incomplete.

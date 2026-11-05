@@ -89,7 +89,7 @@ If the default features are enabled, Hayagriva supports BibTeX and BibLaTeX
 bibliographies. You can use `io::from_biblatex_str` to parse such
 bibliographies.
 
-The [mapping reference](docs/mapping.md) documents the current BibLaTeX/BibTeX import behavior, conversion losses, and separate proposed strict export contracts for BibLaTeX and traditional BibTeX. Export from Hayagriva to BibLaTeX or BibTeX is not currently implemented.
+The [crosswalk specification](docs/crosswalk.adoc) defines conversions between Hayagriva, BibLaTeX, traditional BibTeX, and Citation File Format (CFF), including format-specific constraints, publication relationships, and information-loss policies. The specification is independent of conversion support in a particular implementation.
 
 Should you need more manual control, the library's native `Entry` struct also
 offers an implementation of the `From<&biblatex::Entry>`-Trait. You will need to
